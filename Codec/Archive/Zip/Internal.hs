@@ -209,11 +209,12 @@ scanArchive ::
   FilePath ->
   IO (ArchiveDescription, Map EntrySelector EntryDescription)
 scanArchive path = withBinaryFile path ReadMode $ \h -> do
-  mecdOffset <- locateECD path h
+  fsize <- hFileSize h
+  mecdOffset <- locateECD fsize path h
   case mecdOffset of
     Just ecdOffset -> do
       hSeek h AbsoluteSeek ecdOffset
-      ecdSize <- subtract ecdOffset <$> hFileSize h
+      let ecdSize = fsize - ecdOffset
       ecdRaw <- B.hGet h (fromIntegral ecdSize)
       case runGet getECD ecdRaw of
         Left msg -> throwM (ParsingFailed path msg)
@@ -960,11 +961,10 @@ putECD totalCount cdSize cdOffset mcomment = do
 
 -- | Find the absolute offset of the end of central directory record or, if
 -- present, Zip64 end of central directory record.
-locateECD :: FilePath -> Handle -> IO (Maybe Integer)
-locateECD path h = sizeCheck
+locateECD :: Integer -> FilePath -> Handle -> IO (Maybe Integer)
+locateECD fsize path h = sizeCheck
   where
     sizeCheck = do
-      fsize <- hFileSize h
       let limit = max 0 (fsize - 0xffff - 22)
       if fsize < 22
         then return Nothing
@@ -986,11 +986,10 @@ locateECD path h = sizeCheck
             Just ecd -> return (Just ecd)
         else bool again (return Nothing) done
     checkComment pos = do
-      size <- hFileSize h
       hSeek h AbsoluteSeek (pos + 20)
       l <- fromIntegral <$> getNum getWord16le 2
       return $
-        if l + 22 == size - pos
+        if l + 22 == fsize - pos
           then Just pos
           else Nothing
     checkCDSig pos = do
