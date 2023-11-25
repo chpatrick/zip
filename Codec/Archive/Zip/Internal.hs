@@ -14,13 +14,6 @@
 --
 -- Low-level, non-public types and operations.
 module Codec.Archive.Zip.Internal
-  ( PendingAction (..),
-    targetEntry,
-    scanArchive,
-    sourceEntry,
-    crc32Sink,
-    commit,
-  )
 where
 
 import Codec.Archive.Zip.CP437 (decodeCP437)
